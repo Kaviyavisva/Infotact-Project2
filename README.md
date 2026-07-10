@@ -2,53 +2,91 @@
 
 ## Project Overview
 
-The Autonomous Supply Chain Disruption Monitor is a Generative AI-based system designed to identify and classify global supply chain risks from real-time logistics news.
+The Autonomous Supply Chain Disruption Monitor is a Generative AI-based system designed to identify and classify global supply chain disruptions from real-time logistics news.
 
-The system collects disruption-related news articles, processes the data, classifies potential supply chain threats, and generates a structured disruption report.
+The system continuously collects supply chain-related news articles, processes the information, identifies disruption categories, evaluates severity levels, and generates structured disruption reports.
 
----
-
-## Week 1 Objective
-
-### Web Search Integration and Disruption Classification
-
-The Week 1 implementation focuses on:
-
-- Fetching recent logistics and supply chain news.
-- Processing and cleaning retrieved articles.
-- Classifying disruption events.
-- Generating structured supply chain risk reports.
+This project is developed as part of the **Infotact Internship - Project 3: Logistics & Supply Chain - Autonomous Disruption Monitoring Agent**.
 
 ---
 
-## Week 1 Workflow
+# Week 1: Web Search Integration and Disruption Classification
+
+## Objective
+
+The objective of Week 1 is to build the foundation of the autonomous disruption monitoring system by integrating web search capabilities and implementing disruption classification.
+
+The system performs:
+
+- Real-time logistics news retrieval.
+- News data processing and validation.
+- Supply chain disruption classification.
+- Severity assessment.
+- Structured report generation.
 
 ---
 
-## Features Implemented
+# Week 1 Workflow
+          START
+            |
+            ↓
+    News Fetcher Module
+      (DDGS Search)
+            |
+            ↓
+   Data Processor Module
+  (Clean & Validate Data)
+            |
+            ↓
+   News Classification
+(Category + Severity Detection)
+            |
+            ↓
+    Pydantic Models
+(Structured Data Validation)
+            |
+            ↓
+    Output Writer Module
+            |
+            ↓
+            
+---
 
-### 1. News Fetching
+# Features Implemented
+
+## 1. News Fetching Module
+
+File:
+
+Responsibilities:
 
 - Integrated DDGS search engine.
-- Retrieves recent logistics and supply chain disruption news.
+- Fetches recent supply chain and logistics-related news.
 - Extracts:
-  - Title
+
+  - Article title
   - URL
-  - Summary
+  - News summary
 
 ---
 
-### 2. Data Processing
+## 2. Data Processing Module
 
-- Cleans fetched news data.
+File:
+
+Responsibilities:
+
+- Cleans retrieved news data.
 - Removes incomplete records.
-- Converts data into structured Pydantic models.
+- Converts raw data into structured objects.
 
 ---
 
-### 3. Disruption Classification
+## 3. Disruption Classification Module
 
-The system classifies news into categories:
+File:
+
+The system identifies disruption categories:
 
 - Natural Disaster
 - Labor Strike
@@ -63,77 +101,81 @@ Severity levels:
 - High
 - Critical
 
----
-
-### 4. Structured Data Validation
-
-Implemented Pydantic models:
-
-- NewsArticle
-- ClassifiedArticle
-
-This ensures consistent data flow between modules.
-
----
-
-### 5. Output Generation
-
-Classified results are automatically saved:
-
----
-
-## Project Structure
-
----
-
-## Installation
-
-### 1. Create Virtual Environment
-
-### 2. Activate Environment
-
-Windows:
-
-### 3. Install Dependencies
-
----
-
-## Running the Application
-
-From the project root directory:
-
----
-
-## Sample Output
-
 Example:
 
 ---
 
-## Technologies Used
+## 4. Pydantic Data Validation
 
-- Python
-- DDGS Search
-- Pydantic
-- JSON
-- Logging
-- Modular Python Architecture
+File:
+
+Implemented structured models:
+
+### NewsArticle
+
+Stores:
+
+- Title
+- URL
+- Snippet
+
+
+### ClassifiedArticle
+
+Stores:
+
+- Title
+- Category
+- Severity
+- Reason
+
+This ensures consistent data exchange between modules.
 
 ---
 
-## Future Enhancements
+## 5. Configuration Management
 
-Planned Week 2-4 improvements:
+File:
 
-- Supply chain knowledge graph.
-- Multi-agent architecture using CrewAI/LangGraph.
-- Supplier impact analysis.
-- Alternative sourcing recommendations.
-- Automated disruption action plans.
+Contains:
+
+- Search query configuration.
+- Maximum search results.
+- Classification categories.
+- Severity levels.
+- Output file path.
 
 ---
 
-## Author
+## 6. Logging System
 
-Internship Project:
-**Autonomous Supply Chain Disruption Monitor**
+File:
+
+Implemented application logging for:
+
+- News fetching status.
+- Successful execution.
+- Error tracking.
+
+---
+
+## 7. Output Generation
+
+File:
+
+Automatically generates:
+
+containing classified supply chain disruption information.
+
+---
+
+# Project Structure
+
+---
+
+# Installation
+
+## 1. Create Virtual Environment
+
+```bash
+python -m venv venv
