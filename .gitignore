@@ -18,3 +18,8 @@ Thumbs.db
 
 # Generated outputs
 output/*.json
+
+#backup files
+backup/
+teammate code/
+src/models_backup.py

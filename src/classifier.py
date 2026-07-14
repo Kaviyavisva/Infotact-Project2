@@ -4,6 +4,7 @@ classifier.py
 Rule-based classifier for supply chain disruption news.
 """
 
+import re
 from src.models import NewsArticle, ClassifiedArticle
 
 
@@ -12,30 +13,83 @@ class NewsClassifier:
     Classifies news articles into disruption categories.
     """
 
+    def preprocess_text(self, text):
+        """
+        Clean article text before classification.
+        """
+        text = re.sub(r"<.*?>", "", text)
+        text = re.sub(r"\s+", " ", text)
+        return text.strip().lower()
+
     def classify_article(self, article: NewsArticle) -> ClassifiedArticle:
 
-        text = f"{article.title} {article.snippet}".lower()
+        text = self.preprocess_text(
+            f"{article.title} {article.snippet}"
+        )
 
         category = "Safe"
         severity = "Low"
         reason = "No major supply chain disruption detected."
 
-        if any(word in text for word in ["flood", "earthquake", "cyclone", "storm", "hurricane"]):
+        if any(
+            word in text
+            for word in [
+                "flood",
+                "earthquake",
+                "cyclone",
+                "storm",
+                "hurricane"
+            ]
+        ):
             category = "Natural Disaster"
             severity = "Critical"
             reason = "Natural disaster may disrupt logistics and transportation."
 
-        elif any(word in text for word in ["strike", "workers", "union", "dockworkers"]):
+        elif any(
+            word in text
+            for word in [
+                "strike",
+                "workers",
+                "union",
+                "dockworkers",
+                "walkout",
+                "protest"
+            ]
+        ):
             category = "Labor Strike"
             severity = "High"
             reason = "Labor strike may interrupt supply chain operations."
 
-        elif any(word in text for word in ["war", "conflict", "sanction", "geopolitical"]):
+        elif any(
+            word in text
+            for word in [
+                "war",
+                "conflict",
+                "sanction",
+                "geopolitical",
+                "trade restriction",
+                "border",
+                "tariff",
+                "embargo"
+            ]
+        ):
             category = "Geopolitical Conflict"
             severity = "Critical"
             reason = "Geopolitical issues may impact global trade."
 
-        elif any(word in text for word in ["delay", "shipping", "port", "freight"]):
+        elif any(
+            word in text
+            for word in [
+                "delay",
+                "shipping",
+                "port",
+                "freight",
+                "container",
+                "cargo",
+                "logistics",
+                "transport"
+            ]
+        ):
             category = "Transportation Delay"
             severity = "Medium"
             reason = "Transportation disruptions may delay deliveries."

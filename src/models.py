@@ -13,6 +13,7 @@ class NewsArticle(BaseModel):
     """
     title: str
     url: str
+    source: str = ""
     snippet: str
 
 
