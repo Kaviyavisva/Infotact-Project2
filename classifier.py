@@ -1,0 +1,347 @@
+"""
+classifier.py
+--------------
+News Processing & Disruption Classification module.
+
+Responsibilities covered here:
+1. Preprocess retrieved news articles before classification.
+2. Design prompts for LLM-based disruption classification.
+3. Classify articles into predefined categories.
+4. Assign severity levels (Low, Medium, High, Critical).
+5. Validate classification outputs.
+6. Handle ambiguous or incomplete news articles.
+7. Improve classification consistency and accuracy.
+8. Format classification results for downstream modules.
+
+Author: Mugdha Sangaonkar
+Role: News Processing & Disruption Classification Developer
+"""
+
+import os
+import re
+import json
+import time
+from datetime import datetime, timezone
+
+# -----------------------------------------------------------------------
+# Anthropic client setup
+# -----------------------------------------------------------------------
+# pip install anthropic --break-system-packages
+try:
+    import anthropic
+    _CLIENT = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+except Exception:
+    _CLIENT = None  # allows the module to still load / be tested without a key
+
+MODEL_NAME = "claude-sonnet-4-6"
+
+# -----------------------------------------------------------------------
+# Fixed taxonomy — keep these in sync with the rest of the team
+# (retrieval module tags articles with a source, alert module reads these)
+# -----------------------------------------------------------------------
+CATEGORIES = [
+    "Natural Disaster",
+    "Labor Strike",
+    "Geopolitical Conflict",
+    "Transportation Delay",
+    "Safe / No Risk",
+]
+
+SEVERITY_LEVELS = ["Low", "Medium", "High", "Critical"]
+
+
+# =========================================================================
+# STEP 1 — PREPROCESSING
+# =========================================================================
+def preprocess_article(raw_text: str, max_chars: int = 4000) -> dict:
+    """
+    Cleans a raw news article before it goes to the LLM.
+
+    Returns a dict with:
+        - cleaned_text : cleaned article body
+        - is_incomplete: True if the article is too short/garbled to trust
+        - original_length
+    """
+    if raw_text is None:
+        raw_text = ""
+
+    text = raw_text.strip()
+
+    # Remove HTML tags (many scrapers leave <p>, <div>, etc. in the text)
+    text = re.sub(r"<[^>]+>", " ", text)
+
+    # Remove extra whitespace/newlines
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # Remove common scraping junk (cookie banners, "read more", etc.)
+    junk_patterns = [
+        r"(?i)subscribe to.*?newsletter",
+        r"(?i)click here to read more",
+        r"(?i)accept all cookies",
+    ]
+    for pat in junk_patterns:
+        text = re.sub(pat, "", text)
+
+    original_length = len(text)
+
+    # Truncate very long articles (keeps prompt cost + latency low)
+    if len(text) > max_chars:
+        text = text[:max_chars] + " ...[truncated]"
+
+    # Flag incomplete/ambiguous articles early (Step 5 relies on this too)
+    is_incomplete = original_length < 40  # too short to classify confidently
+
+    return {
+        "cleaned_text": text,
+        "is_incomplete": is_incomplete,
+        "original_length": original_length,
+    }
+
+
+# =========================================================================
+# STEP 2 — PROMPT DESIGN
+# =========================================================================
+def build_classification_prompt(article_text: str, source: str = "unknown") -> str:
+    """
+    Builds a structured prompt that forces the LLM to reason briefly
+    and then return ONLY valid JSON — this keeps Step 3/4 (parsing +
+    validation) reliable.
+    """
+    categories_str = ", ".join(CATEGORIES)
+    severity_str = ", ".join(SEVERITY_LEVELS)
+
+    prompt = f"""You are a supply-chain risk analyst. Classify the news article below
+for its potential impact on global logistics and supply chains.
+
+CATEGORIES (choose exactly one): {categories_str}
+SEVERITY LEVELS (choose exactly one): {severity_str}
+
+Guidelines:
+- "Natural Disaster": earthquakes, floods, hurricanes, wildfires, etc. affecting ports/routes/warehouses.
+- "Labor Strike": union strikes, worker walkouts at ports, factories, transport companies.
+- "Geopolitical Conflict": wars, sanctions, trade restrictions, border closures, piracy.
+- "Transportation Delay": port congestion, canal blockage, flight/rail/shipping delays, fuel shortages.
+- "Safe / No Risk": no meaningful supply chain impact.
+- Severity should reflect scale, duration, and how many supply chains are affected.
+- If the article is too vague, incomplete, or unrelated to logistics, use category
+  "Safe / No Risk" and severity "Low", and clearly say so in "reasoning".
+- Give a confidence score between 0 and 1 for your classification.
+
+Respond ONLY with valid JSON in this exact schema, nothing else:
+{{
+  "category": "<one of the categories above>",
+  "severity": "<one of the severity levels above>",
+  "confidence": <float between 0 and 1>,
+  "reasoning": "<one or two sentence justification>"
+}}
+
+Source: {source}
+Article:
+\"\"\"{article_text}\"\"\"
+"""
+    return prompt
+
+
+# =========================================================================
+# STEP 3 — CLASSIFICATION (LLM call)
+# =========================================================================
+def _call_llm(prompt: str, retries: int = 2) -> str:
+    """Low-level wrapper around the Anthropic API call, with basic retry."""
+    if _CLIENT is None:
+        raise RuntimeError(
+            "Anthropic client not configured. Set ANTHROPIC_API_KEY env var."
+        )
+
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            response = _CLIENT.messages.create(
+                model=MODEL_NAME,
+                max_tokens=300,
+                temperature=0,  # deterministic -> improves consistency (Step 6)
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text
+        except Exception as e:
+            last_error = e
+            time.sleep(1.5 * (attempt + 1))
+    raise RuntimeError(f"LLM call failed after retries: {last_error}")
+
+
+def classify_article(article_text: str, source: str = "unknown") -> dict:
+    """
+    Full classification pipeline for a single article:
+    preprocess -> prompt -> LLM call -> parse -> validate -> format.
+    """
+    pre = preprocess_article(article_text)
+
+    # Step 5: handle incomplete articles before even calling the LLM
+    if pre["is_incomplete"]:
+        return format_output(
+            category="Safe / No Risk",
+            severity="Low",
+            confidence=0.3,
+            reasoning="Article too short/incomplete to classify reliably.",
+            source=source,
+            flagged_ambiguous=True,
+        )
+
+    prompt = build_classification_prompt(pre["cleaned_text"], source)
+
+    try:
+        raw_response = _call_llm(prompt)
+    except RuntimeError as e:
+        # LLM unreachable -> fail safe instead of crashing the pipeline
+        return format_output(
+            category="Safe / No Risk",
+            severity="Low",
+            confidence=0.0,
+            reasoning=f"Classification failed: {e}",
+            source=source,
+            flagged_ambiguous=True,
+        )
+
+    parsed = _parse_llm_json(raw_response)
+    validated = validate_classification(parsed)
+
+    return format_output(
+        category=validated["category"],
+        severity=validated["severity"],
+        confidence=validated["confidence"],
+        reasoning=validated["reasoning"],
+        source=source,
+        flagged_ambiguous=validated["flagged_ambiguous"],
+    )
+
+
+def _parse_llm_json(raw_response: str) -> dict:
+    """Extracts JSON from the LLM's raw text response."""
+    # Strip markdown code fences if the model adds them despite instructions
+    cleaned = re.sub(r"```json|```", "", raw_response).strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Try to salvage JSON substring if there's stray text around it
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+        return {}  # will be caught by validate_classification
+
+
+# =========================================================================
+# STEP 4 — VALIDATION
+# =========================================================================
+def validate_classification(result: dict) -> dict:
+    """
+    Ensures the LLM output matches the expected schema and value set.
+    Falls back to safe defaults + flags ambiguity if anything is off.
+    This is what keeps garbage/hallucinated output from reaching
+    the alert/downstream modules.
+    """
+    category = result.get("category")
+    severity = result.get("severity")
+    confidence = result.get("confidence")
+    reasoning = result.get("reasoning", "")
+
+    flagged_ambiguous = False
+
+    if category not in CATEGORIES:
+        flagged_ambiguous = True
+        category = "Safe / No Risk"
+
+    if severity not in SEVERITY_LEVELS:
+        flagged_ambiguous = True
+        severity = "Low"
+
+    try:
+        confidence = float(confidence)
+        if not (0.0 <= confidence <= 1.0):
+            raise ValueError
+    except (TypeError, ValueError):
+        flagged_ambiguous = True
+        confidence = 0.3
+
+    # Low confidence -> flag for human/manual review downstream
+    if confidence < 0.5:
+        flagged_ambiguous = True
+
+    if not reasoning:
+        reasoning = "No reasoning provided by model."
+
+    return {
+        "category": category,
+        "severity": severity,
+        "confidence": round(confidence, 2),
+        "reasoning": reasoning,
+        "flagged_ambiguous": flagged_ambiguous,
+    }
+
+
+# =========================================================================
+# STEP 6 (helper) — OUTPUT FORMATTING for downstream modules
+# =========================================================================
+def format_output(
+    category: str,
+    severity: str,
+    confidence: float,
+    reasoning: str,
+    source: str,
+    flagged_ambiguous: bool = False,
+) -> dict:
+    """
+    Standard schema every downstream module (alerting, dashboard, DB)
+    should expect. Keep this stable — changing keys breaks other people's code.
+    """
+    return {
+        "category": category,
+        "severity": severity,
+        "confidence": confidence,
+        "reasoning": reasoning,
+        "source": source,
+        "flagged_ambiguous": flagged_ambiguous,
+        "classified_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# =========================================================================
+# BATCH CLASSIFICATION — for pipeline use
+# =========================================================================
+def classify_batch(articles: list) -> list:
+    """
+    articles: list of dicts like {"text": "...", "source": "..."}
+    Returns a list of formatted classification results, same order as input.
+    """
+    results = []
+    for article in articles:
+        text = article.get("text", "")
+        source = article.get("source", "unknown")
+        results.append(classify_article(text, source))
+    return results
+
+
+# =========================================================================
+# QUICK MANUAL TEST (offline, no API key needed)
+# =========================================================================
+if __name__ == "__main__":
+    # Test preprocessing + validation logic without hitting the API
+    sample = preprocess_article("<p>Port workers in Los Angeles began a strike today...</p>")
+    print("Preprocessed:", sample)
+
+    # Test validation fallback with a deliberately broken LLM output
+    fake_bad_output = {"category": "Unknown", "severity": "Extreme", "confidence": "high"}
+    print("Validated (fallback):", validate_classification(fake_bad_output))
+
+    # Full pipeline (requires ANTHROPIC_API_KEY set in environment)
+    if _CLIENT is not None:
+        test_article = (
+            "A major earthquake struck the port city of Valparaiso, Chile, "
+            "damaging container terminals and halting cargo operations for at "
+            "least two weeks, according to port authorities."
+        )
+        result = classify_article(test_article, source="Reuters")
+        print(json.dumps(result, indent=2))
+    else:
+        print("Set ANTHROPIC_API_KEY to test live classification.")
