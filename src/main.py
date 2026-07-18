@@ -1,33 +1,56 @@
 """
 main.py
 
-Entry point for the Autonomous Supply Chain Disruption Monitoring Agent.
+Entry point for the Autonomous Supply Chain
+Disruption Monitoring Agent.
 """
 
 from src.pipeline import SupplyChainPipeline
 
 
 def main():
-    """
-    Run the complete Week 1 pipeline.
-    """
 
     pipeline = SupplyChainPipeline()
 
-    results = pipeline.run()
+    reports = pipeline.run()
 
     print("\n========== SUPPLY CHAIN DISRUPTION REPORT ==========\n")
 
-    if not results:
-        print("No news articles found.")
+    if not reports:
+        print("No reports generated.")
         return
 
-    for i, result in enumerate(results, start=1):
+    for i, report in enumerate(reports, start=1):
+
         print(f"Article {i}")
-        print(f"Title     : {result.title}")
-        print(f"Category  : {result.category}")
-        print(f"Severity  : {result.severity}")
-        print(f"Reason    : {result.reason}")
+
+        print(f"Generated At       : {report['generated_at']}")
+        print(f"Title              : {report['Title']}")
+        print(f"Category           : {report['Category']}")
+        print(f"Severity           : {report['Severity']}")
+        print(f"Risk Score         : {report['Risk Score']}")
+        print(f"Impact             : {report['Impact']}")
+        print(f"Priority           : {report['Priority']}")
+        print(f"Recovery Time      : {report['Estimated Recovery']}")
+        print(f"Primary Action     : {report['Primary Action']}")
+        print(f"Reason             : {report['Reason']}")
+
+        print("\nRecommendations:")
+
+        for rec in report["Recommendations"]:
+            print(f"  • {rec}")
+
+        entities = report.get("Entities", {})
+
+        if entities:
+
+            print("\nExtracted Entities:")
+
+            for key, values in entities.items():
+
+                if values:
+                    print(f"  {key.title():18}: {', '.join(values)}")
+
         print("-" * 70)
 
 

@@ -1,31 +1,52 @@
 import streamlit as st
+import json
+import os
 
 st.set_page_config(
     page_title="Supplier Impact",
-    page_icon="📈",
+    page_icon="🏭",
     layout="wide"
 )
 
-st.title("📈 Supplier Impact Analysis")
+st.title("🏭 Supplier Impact Assessment")
 
-st.markdown("""
-## Module Overview
+OUTPUT_FILE = "output/classified_news.json"
 
-This module evaluates how disruptions affect suppliers.
+if not os.path.exists(OUTPUT_FILE):
+    st.warning("Please run the pipeline first.")
+    st.stop()
 
-### Analysis Parameters
+with open(OUTPUT_FILE, "r", encoding="utf-8") as file:
+    reports = json.load(file)
 
-- Disruption Category
-- Severity Level
-- Geographic Location
-- Industry Affected
+st.success(f"Loaded {len(reports)} reports.")
 
-### Impact Levels
+for i, report in enumerate(reports, start=1):
 
-- 🟢 Minimal
-- 🟡 Moderate
-- 🟠 Significant
-- 🔴 Severe
-""")
+    with st.expander(f"Article {i}: {report['Title']}"):
 
-st.info("🚧 Waiting for Week 2 Integration")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric("Impact Level", report["Impact"])
+            st.metric("Risk Score", report["Risk Score"])
+
+        with col2:
+            st.metric("Priority", report["Priority"])
+            st.metric("Recovery Time", report["Estimated Recovery"])
+
+        st.write("### Risk Assessment")
+        st.info(report["Reason"])
+
+        entities = report.get("Entities", {})
+
+        suppliers = entities.get("suppliers", [])
+
+        if suppliers:
+            st.write("### Affected Suppliers")
+
+            for supplier in suppliers:
+                st.write(f"• {supplier}")
+        else:
+            st.write("### Affected Suppliers")
+            st.write("No supplier identified.")

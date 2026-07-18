@@ -1,4 +1,6 @@
 import streamlit as st
+import json
+import os
 
 st.set_page_config(
     page_title="News Analysis",
@@ -8,21 +10,40 @@ st.set_page_config(
 
 st.title("📰 News Analysis")
 
-st.markdown("""
-## Module Overview
+st.markdown("### Classified Supply Chain Disruption News")
 
-This module performs the complete Week 1 pipeline.
+OUTPUT_FILE = "output/classified_news.json"
 
-### Features
+if not os.path.exists(OUTPUT_FILE):
+    st.warning("No classified news found. Please run the pipeline first.")
+    st.stop()
 
-- 📰 Fetch latest logistics news
-- ⚙️ Process retrieved articles
-- 🤖 AI-based disruption classification
-- 📊 Generate structured news output
+with open(OUTPUT_FILE, "r", encoding="utf-8") as file:
+    reports = json.load(file)
 
-The backend pipeline has already been completed successfully.
-""")
+st.success(f"Loaded {len(reports)} reports.")
 
-st.success("✅ Week 1 Pipeline Ready")
+for i, report in enumerate(reports, start=1):
 
-st.info("The complete backend integration will be connected after Week 2.")
+    with st.expander(f"📰 Article {i}: {report['Title']}"):
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric("Category", report["Category"])
+
+        with col2:
+            st.metric("Severity", report["Severity"])
+
+        st.metric("Risk Score", report["Risk Score"])
+
+        st.write("### Reason")
+        st.write(report["Reason"])
+
+        st.write("### Primary Action")
+        st.success(report["Primary Action"])
+
+        st.write("### Recommendations")
+
+        for rec in report["Recommendations"]:
+            st.write("• " + rec)

@@ -1,4 +1,6 @@
 import streamlit as st
+import json
+import os
 
 st.set_page_config(
     page_title="Entity Extraction",
@@ -8,22 +10,41 @@ st.set_page_config(
 
 st.title("📍 Entity Extraction")
 
-st.markdown("""
-## Module Overview
+OUTPUT_FILE = "output/classified_news.json"
 
-This module extracts important logistics entities from classified news articles.
+if not os.path.exists(OUTPUT_FILE):
+    st.warning("Please run the pipeline first.")
+    st.stop()
 
-### Entities Extracted
+with open(OUTPUT_FILE, "r", encoding="utf-8") as file:
+    reports = json.load(file)
 
-- 🌍 Countries
-- 🏙 Cities
-- 🚢 Ports
-- ✈ Airports
-- 🏭 Manufacturing Plants
-- 🚛 Suppliers
-- 🛣 Shipping Routes
+st.success(f"Loaded {len(reports)} reports.")
 
-The extracted entities will be used for supplier impact analysis.
-""")
+for i, report in enumerate(reports, start=1):
 
-st.info("🚧 Waiting for Week 2 Integration")
+    with st.expander(f"Article {i}: {report['Title']}"):
+
+        entities = report.get("Entities", {})
+
+        if not entities:
+            st.info("No entities extracted.")
+            continue
+
+        cols = st.columns(2)
+
+        keys = list(entities.keys())
+
+        for index, key in enumerate(keys):
+
+            values = entities[key]
+
+            with cols[index % 2]:
+
+                st.subheader(key.replace("_", " ").title())
+
+                if values:
+                    for value in values:
+                        st.write(f"• {value}")
+                else:
+                    st.write("No entities found.")
