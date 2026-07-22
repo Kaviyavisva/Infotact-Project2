@@ -1,18 +1,7 @@
 import re
-import subprocess
-import sys
-
 import spacy
 
-# Load spaCy model. If it is not installed, download it first.
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    subprocess.check_call(
-        [sys.executable, "-m", "spacy", "download", "en_core_web_sm"]
-    )
-    nlp = spacy.load("en_core_web_sm")
-
+nlp = spacy.blank("en")
 # -----------------------------
 # Normalization dictionaries
 # -----------------------------
