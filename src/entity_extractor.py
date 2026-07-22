@@ -1,7 +1,17 @@
-import spacy
 import re
+import subprocess
+import sys
 
-nlp = spacy.load("en_core_web_sm")
+import spacy
+
+# Load spaCy model. If it is not installed, download it first.
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    subprocess.check_call(
+        [sys.executable, "-m", "spacy", "download", "en_core_web_sm"]
+    )
+    nlp = spacy.load("en_core_web_sm")
 
 # -----------------------------
 # Normalization dictionaries
@@ -59,12 +69,13 @@ def extract_entities(news):
     """
 
     text = (
-    news.get("title", "")
-    + "\n"
-    + news.get("content", "")
-    + "\n"
-    + news.get("reason", "")
-)
+        news.get("title", "")
+        + "\n"
+        + news.get("content", "")
+        + "\n"
+        + news.get("reason", "")
+    )
+
     doc = nlp(text)
 
     entities = {
@@ -88,23 +99,23 @@ def extract_entities(news):
 
             if value in CITY_COUNTRY_MAP:
                 entities["cities"].append(value)
-
             else:
                 entities["countries"].append(normalize_country(value))
 
         elif ent.label_ == "ORG":
+
             if value.endswith("Plant"):
                 entities["plants"].append(value)
                 entities["suppliers"].append(
-                   re.sub(r"\s+Plant$", "", value).strip()
+                    re.sub(r"\s+Plant$", "", value).strip()
                 )
+
             elif not value.endswith(("Port", "Airport")):
                 entities["suppliers"].append(value)
 
     # -----------------------------
     # Rule-based extraction
     # -----------------------------
-
     port_pattern = r'\b([A-Z][A-Za-z]*(?:\s[A-Z][A-Za-z]*)*\sPort)\b'
 
     airport_pattern = r'\b([A-Z][A-Za-z]*(?:\s[A-Z][A-Za-z]*)*\sAirport)\b'
@@ -121,29 +132,24 @@ def extract_entities(news):
     # Infer supplier names from plant names
     for plant in entities["plants"]:
         supplier = re.sub(r"\s+Plant$", "", plant).strip()
+
         if supplier:
             entities["suppliers"].append(supplier)
 
-    # -----------------------------
     # Infer country from city
-    # -----------------------------
     for city in entities["cities"]:
         country = CITY_COUNTRY_MAP.get(city)
 
         if country:
             entities["countries"].append(country)
 
-    # -----------------------------
     # Normalize countries
-    # -----------------------------
     entities["countries"] = [
         normalize_country(c)
         for c in entities["countries"]
     ]
 
-    # -----------------------------
     # Remove duplicates
-    # -----------------------------
     for key in entities:
         entities[key] = remove_duplicates(entities[key])
 
@@ -153,7 +159,6 @@ def extract_entities(news):
 # --------------------------------------------------
 # Example
 # --------------------------------------------------
-
 if __name__ == "__main__":
 
     sample_news = {
