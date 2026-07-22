@@ -38,6 +38,22 @@ The platform automatically:
 
 st.success("✅ Week 1 completed successfully | 🚧 Week 2 integration in progress")
 
+# ------------------------------
+# Run Pipeline
+# ------------------------------
+st.subheader("🚀 Run Pipeline")
+
+if st.button("▶ Run Supply Chain Pipeline"):
+
+    with st.spinner("Running Supply Chain Pipeline..."):
+
+        pipeline = SupplyChainPipeline()
+        reports = pipeline.run()
+
+    st.success(
+        f"✅ Pipeline completed successfully! Generated {len(reports)} reports."
+    )
+
 st.divider()
 
 # ------------------------------
@@ -99,10 +115,10 @@ team_data = {
 
 for member, role in team_data.items():
     st.write(f"**{member}** — {role}")
+
 # ------------------------------
 # System Workflow
 # ------------------------------
-
 st.divider()
 
 st.subheader("🔄 System Workflow")
@@ -130,46 +146,6 @@ Supplier Impact Analysis (Week 2)
 Recommendation Engine (Week 2)
           │
           ▼
-Final Risk Report""")
-
-
-
-# ✅ Step 5 – Add Project Highlights
-
-
-st.subheader("⭐ Project Highlights")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.success("✅ AI-powered disruption classification")
-    st.success("✅ Modular pipeline architecture")
-    st.success("✅ Streamlit web interface")
-
-with col2:
-    st.info("🚧 Entity Extraction")
-    st.info("🚧 Supplier Impact Analysis")
-    st.info("🚧 Recommendation Engine")
-# ------------------------------
-# Upcoming Modules
-# ------------------------------
-st.divider()
-
-st.subheader("📍 Entity Extraction")
-st.info("This module will be integrated in Week 2.")
-
-st.subheader("📈 Supplier Impact Analysis")
-st.info("This module will be integrated in Week 2.")
-
-st.subheader("💡 Mitigation Recommendation")
-st.info("This module will be integrated in Week 2.")
-
-st.subheader("📄 Final Risk Report")
-st.info("This module will be integrated in Week 2.")
-
-st.divider()
-
-st.caption(
-    "Autonomous Supply Chain Disruption Monitor | "
-    "InfoTact Solutions Internship | Week 2 Development"
-)
+Final Risk Report
+            ```
+""")
