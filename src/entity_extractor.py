@@ -1,7 +1,10 @@
 import re
 import spacy
 
-nlp = spacy.blank("en")
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    nlp = spacy.blank("en")
 # -----------------------------
 # Normalization dictionaries
 # -----------------------------

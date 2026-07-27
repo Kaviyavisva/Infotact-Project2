@@ -64,27 +64,32 @@ class RecommendationEngine:
 
         recommendations = self.rules.get(
             category,
-            ["Continue monitoring the situation."]
+            [
+                "Continue monitoring the situation.",
+                "Inform stakeholders about the disruption.",
+                "Review contingency plans.",
+                "Monitor updates regularly."
+            ]
         )
 
-        # Recommendation details
-        impact_data["recommendations"] = recommendations
+        priority = self._calculate_priority(risk_score)
 
-        impact_data["priority"] = self._calculate_priority(risk_score)
-
-        impact_data["recommended_action"] = recommendations[0]
-
-        impact_data["estimated_recovery"] = {
-
+        recovery_days = {
             "Critical": "5-7 Days",
             "High": "3-5 Days",
             "Medium": "1-2 Days",
             "Low": "Within 24 Hours"
+        }
 
-        }[impact_data["priority"]]
+        impact_data["recommendations"] = recommendations
 
-        # Preserve entities if present
-        if "entities" not in impact_data:
-            impact_data["entities"] = {}
+        impact_data["priority"] = priority
+
+        impact_data["recommended_action"] = recommendations[0]
+
+        impact_data["estimated_recovery"] = recovery_days[priority]
+
+        # Keep extracted entities if already available
+        impact_data.setdefault("entities", {})
 
         return impact_data

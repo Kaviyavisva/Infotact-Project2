@@ -29,46 +29,83 @@ class SupplyChainPipeline:
 
     def run(self):
 
-        # Step 1
-        articles = self.fetcher.fetch_news()
+        # -----------------------------
+        # Step 1 : Fetch News
+        # -----------------------------
+        try:
+            articles = self.fetcher.fetch_news()
+            print("✅ News Fetcher Completed")
+        except Exception as e:
+            print(f"❌ News Fetcher Failed: {e}")
+            return []
 
-        # Step 2
-        processed_articles = self.processor.process_articles(articles)
+        # -----------------------------
+        # Step 2 : Process News
+        # -----------------------------
+        try:
+            processed_articles = self.processor.process_articles(articles)
+            print("✅ Data Processor Completed")
+        except Exception as e:
+            print(f"❌ Data Processor Failed: {e}")
+            return []
 
         final_reports = []
 
+        # -----------------------------
         # Step 3 onwards
+        # -----------------------------
         for article in processed_articles:
 
-            # Classify the article
-            classified = self.classifier.classify_article(article)
+            try:
 
-            # Extract entities
-            entity_input = {
-                "title": classified.title,
-                "content": "",
-                "category": classified.category,
-                "severity": classified.severity,
-                "reason": classified.reason
-            }
+                # Risk Classification
+                classified = self.classifier.classify_article(article)
+                print("✅ Risk Classification Completed")
 
-            entities = extract_entities(entity_input)
+                # Entity Extraction
+                entity_input = {
+                    "title": article.title,
+                    "content": article.snippet,
+                    "category": classified.category,
+                    "severity": classified.severity,
+                    "reason": classified.reason
+                }
 
-            # Analyze impact
-            impact = self.impact_analyzer.analyze(classified)
+                entities = extract_entities(entity_input)
+                print("✅ Entity Extraction Completed")
 
-            # Attach extracted entities
-            impact["entities"] = entities
+                # Supplier Impact Analysis
+                impact = self.impact_analyzer.analyze(classified)
+                print("✅ Supplier Impact Analysis Completed")
 
-            # Generate recommendations
-            recommendation = self.recommendation_engine.generate(impact)
+                # Attach entities
+                impact["entities"] = entities
 
-            # Generate report
-            report = self.report_generator.generate(recommendation)
+                # Recommendation Engine
+                recommendation = self.recommendation_engine.generate(impact)
+                print("✅ Recommendation Engine Completed")
 
-            final_reports.append(report)
+                # Attach entities again
+                recommendation["entities"] = entities
 
-        # Save reports
-        self.output_writer.save_results(final_reports)
+                # Report Generation
+                report = self.report_generator.generate(recommendation)
+                print("✅ Report Generation Completed")
+
+                final_reports.append(report)
+
+            except Exception as e:
+                print(f"❌ Error processing article: {article.title}")
+                print(f"Reason: {e}")
+                continue
+
+        # -----------------------------
+        # Save Results
+        # -----------------------------
+        try:
+            self.output_writer.save_results(final_reports)
+            print("✅ Results Saved Successfully")
+        except Exception as e:
+            print(f"❌ Failed to save results: {e}")
 
         return final_reports

@@ -36,6 +36,10 @@ class ReportGenerator:
 
             "Recommendations": data["recommendations"],
 
+            "Recommendation Count": len(data["recommendations"]),
+
+            "Status": "Generated Successfully",
+
             # Entity information
             "Entities": data.get("entities", {})
 
@@ -45,35 +49,25 @@ class ReportGenerator:
 
     def display(self, report):
 
-        print("=" * 65)
-
+        print("=" * 70)
         print("        SUPPLY CHAIN DISRUPTION REPORT")
-
-        print("=" * 65)
+        print("=" * 70)
 
         print(f"Generated At       : {report['generated_at']}")
-
         print(f"Title              : {report['Title']}")
-
         print(f"Category           : {report['Category']}")
-
         print(f"Severity           : {report['Severity']}")
-
         print(f"Risk Score         : {report['Risk Score']}")
-
         print(f"Impact             : {report['Impact']}")
-
         print(f"Priority           : {report['Priority']}")
-
         print(f"Recovery Time      : {report['Estimated Recovery']}")
-
         print(f"Primary Action     : {report['Primary Action']}")
-
         print(f"Reason             : {report['Reason']}")
+        print(f"Status             : {report['Status']}")
+        print(f"Recommendations    : {report['Recommendation Count']}")
 
         print("\nRecommended Actions")
-
-        print("-" * 65)
+        print("-" * 70)
 
         for i, rec in enumerate(report["Recommendations"], start=1):
             print(f"{i}. {rec}")
@@ -83,13 +77,11 @@ class ReportGenerator:
         if entities:
 
             print("\nExtracted Entities")
-
-            print("-" * 65)
+            print("-" * 70)
 
             for key, values in entities.items():
 
                 if values:
-
                     print(f"{key.title():20}: {', '.join(values)}")
 
-        print("=" * 65)
+        print("=" * 70)
