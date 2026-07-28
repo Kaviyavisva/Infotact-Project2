@@ -27,4 +27,4 @@ analyzes supplier impact, and provides mitigation recommendations.
 Use the navigation panel on the left to explore each module.
 """)
 
-st.success("Project Status: 🚧 Week 2 Development in Progress")
+st.success("Project Status: 🚧 Week 4 Development in Progress")

@@ -51,6 +51,9 @@ if st.button("▶ Run Supply Chain Pipeline"):
 
         pipeline = SupplyChainPipeline()
         reports = pipeline.run()
+        # Read the generated JSON report
+        with open("output/classified_news.json", "r", encoding="utf-8") as file:
+            report_json = file.read()
 
         end_time = time.time()
         execution_time = round(end_time - start_time, 2)
@@ -58,20 +61,16 @@ if st.button("▶ Run Supply Chain Pipeline"):
     st.success(
         f"✅ Pipeline completed successfully! Generated {len(reports)} reports."
     )
+    st.download_button(
+    label="📥 Download JSON Report",
+    data=report_json,
+    file_name="classified_news.json",
+    mime="application/json"
+)
 
     st.info(f"⏱ Pipeline Execution Time: {execution_time} seconds")
 
-    # ------------------------------
-    # Download JSON Report
-    # ------------------------------
-    json_data = json.dumps(reports, indent=4)
-
-    st.download_button(
-        label="📥 Download JSON Report",
-        data=json_data,
-        file_name="classified_news.json",
-        mime="application/json"
-    )
+   
 
     st.divider()
 
@@ -253,13 +252,13 @@ st.subheader("📊 Project Status")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("Sprint", "Week 3")
+    st.metric("Sprint", "Week 4")
 
 with col2:
-    st.metric("Overall Progress", "75%")
+    st.metric("Overall Progress", "100%")
 
 with col3:
-    st.metric("Application Status", "🟢 Active")
+    st.metric("Application Status", "🟢 Validated")
 
 # ------------------------------
 # Development Team

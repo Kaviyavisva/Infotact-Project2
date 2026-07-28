@@ -24,7 +24,6 @@ with open(OUTPUT_FILE, "r", encoding="utf-8") as file:
 st.success(f"Loaded {len(reports)} reports.")
 
 for i, report in enumerate(reports, start=1):
-
     with st.expander(f"📰 Article {i}: {report['Title']}"):
 
         col1, col2 = st.columns(2)
@@ -37,6 +36,16 @@ for i, report in enumerate(reports, start=1):
 
         st.metric("Risk Score", report["Risk Score"])
 
+        col3, col4 = st.columns(2)
+
+        with col3:
+            st.metric("Priority", report["Priority"])
+
+        with col4:
+            st.metric("Recommendations", report["Recommendation Count"])
+
+        st.success(f"Status: {report['Status']}")
+
         st.write("### Reason")
         st.write(report["Reason"])
 
@@ -44,6 +53,5 @@ for i, report in enumerate(reports, start=1):
         st.success(report["Primary Action"])
 
         st.write("### Recommendations")
-
         for rec in report["Recommendations"]:
             st.write("• " + rec)

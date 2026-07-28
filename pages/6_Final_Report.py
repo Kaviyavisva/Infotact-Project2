@@ -35,6 +35,8 @@ for i, report in enumerate(reports, start=1):
         st.write(f"**Risk Score:** {report['Risk Score']}")
         st.write(f"**Priority:** {report['Priority']}")
         st.write(f"**Estimated Recovery:** {report['Estimated Recovery']}")
+        st.write(f"**Status:** {report['Status']}")
+        st.write(f"**Recommendation Count:** {report['Recommendation Count']}")
 
         st.markdown("---")
 

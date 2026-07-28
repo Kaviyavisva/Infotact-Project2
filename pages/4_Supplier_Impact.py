@@ -37,6 +37,7 @@ for i, report in enumerate(reports, start=1):
 
         st.write("### Risk Assessment")
         st.info(report["Reason"])
+        st.success(f"Report Status: {report['Status']}")
 
         entities = report.get("Entities", {})
 

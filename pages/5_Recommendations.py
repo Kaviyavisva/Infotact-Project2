@@ -53,3 +53,10 @@ for i, report in enumerate(reports, start=1):
         st.subheader("Estimated Recovery")
 
         st.metric("Recovery Time", report["Estimated Recovery"])
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric("Recommendations", report["Recommendation Count"])
+
+        with col2:
+            st.metric("Status", report["Status"])

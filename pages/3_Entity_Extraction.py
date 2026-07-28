@@ -20,6 +20,7 @@ with open(OUTPUT_FILE, "r", encoding="utf-8") as file:
     reports = json.load(file)
 
 st.success(f"Loaded {len(reports)} reports.")
+st.info("Showing extracted Countries, Cities, Ports, Airports, Suppliers, Plants and Shipping Routes.")
 
 for i, report in enumerate(reports, start=1):
 
