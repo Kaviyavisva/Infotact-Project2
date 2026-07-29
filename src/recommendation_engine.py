@@ -14,7 +14,7 @@ class DisruptionContext(BaseModel):
     Data model representing the context of a supply chain disruption.
     This acts as the input to the Recommendation Engine.
     """
-    disruption_type: str = Field(..., description="Category of disruption (e.g., Strike, Weather, Geopolitical)")
+    disruption_type: str = Field(..., description="Category of disruption (e.g., Strike, Weather, Geopolitical, Cyberattack)")
     impact_level: str = Field(..., description="Severity of impact: Low, Medium, High, Severe")
     affected_supplier: str = Field(..., description="Name of the affected supplier")
     affected_location: str = Field(..., description="Location (City/Port/Region) of the disruption")
@@ -75,6 +75,42 @@ class RecommendationEngine:
                 "action": "Airport diversion",
                 "estimated_time": "12-24 hours",
                 "expected_benefit": "Bypasses severe weather zones ensuring timely delivery."
+            },
+            {
+                "trigger": {"disruption_type": "Cyberattack"},
+                "action": "Manual system override",
+                "estimated_time": "4-8 hours",
+                "expected_benefit": "Restores basic operations while systems are secured."
+            },
+            {
+                "trigger": {"disruption_type": "Equipment failure"},
+                "action": "Dispatch maintenance crews",
+                "estimated_time": "12-48 hours",
+                "expected_benefit": "Minimizes downtime of critical machinery."
+            },
+            {
+                "trigger": {"disruption_type": "Transportation delay"},
+                "action": "Expedite priority shipments",
+                "estimated_time": "24 hours",
+                "expected_benefit": "Ensures critical components arrive despite delays."
+            },
+            {
+                "trigger": {"disruption_type": "Supplier shutdown"},
+                "action": "Activate secondary suppliers",
+                "estimated_time": "48-72 hours",
+                "expected_benefit": "Re-establishes supply line immediately."
+            },
+            {
+                "trigger": {"disruption_type": "Port congestion"},
+                "action": "Reroute to secondary ports",
+                "estimated_time": "2-3 days",
+                "expected_benefit": "Bypasses unloading bottlenecks."
+            },
+            {
+                "trigger": {"disruption_type": "Inventory shortage"},
+                "action": "Ration existing inventory",
+                "estimated_time": "Immediate",
+                "expected_benefit": "Prevents complete stockouts for high-margin products."
             },
             {
                 "trigger": {"impact_level": ["High", "Severe"]},
@@ -145,10 +181,68 @@ class RecommendationEngine:
         else:
             return f"Standard mitigation protocol for a {context.impact_level.lower()} {context.disruption_type} event at {context.affected_location}."
 
+    def validate_recommendations(self, recommendations: List[Recommendation]) -> Dict[str, Any]:
+        """
+        Validates the generated recommendations for correctness, completeness, 
+        priority assignment, and ordering.
+        Returns a validation summary dict.
+        """
+        summary = {
+            "is_valid": True,
+            "errors": [],
+            "warnings": [],
+            "priorities_verified": False,
+            "completeness_verified": False
+        }
+        
+        if not recommendations:
+            summary["is_valid"] = False
+            summary["errors"].append("Recommendation list is empty.")
+            return summary
+
+        # Completeness Check
+        for i, rec in enumerate(recommendations):
+            if not all([rec.action, rec.priority, rec.estimated_time, rec.expected_benefit, rec.reason]):
+                summary["is_valid"] = False
+                summary["errors"].append(f"Recommendation {i+1} is missing fields.")
+                
+        summary["completeness_verified"] = len(summary["errors"]) == 0
+
+        # Priority Verification (Ordering and Duplicates)
+        priority_map = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+        seen_priorities = set()
+        prev_priority_val = -1
+        
+        for i, rec in enumerate(recommendations):
+            p_val = priority_map.get(rec.priority, 4)
+            
+            # Check ordering
+            if p_val < prev_priority_val:
+                summary["is_valid"] = False
+                summary["errors"].append(f"Ordering error: {rec.priority} appears after lower priority.")
+            prev_priority_val = p_val
+            
+            # Check duplicates
+            if p_val in seen_priorities:
+                summary["is_valid"] = False
+                summary["errors"].append(f"Duplicate priority detected: {rec.priority}.")
+            seen_priorities.add(p_val)
+            
+        summary["priorities_verified"] = len(summary["errors"]) == 0
+
+        if summary["is_valid"]:
+            logger.info("Validation completed successfully: Recommendations are complete and correctly ordered.")
+        else:
+            logger.warning(f"Validation failed with errors: {summary['errors']}")
+            
+        return summary
+
     def generate_recommendations(self, raw_context: Dict[str, Any]) -> List[Recommendation]:
         """
         Validates input and generates a list of prioritized recommendations.
         """
+        import time
+        start_time = time.time()
         logger.debug(f"Received input for recommendations: {raw_context}")
         
         # 1. Validation
@@ -221,5 +315,38 @@ class RecommendationEngine:
         priority_map = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
         generated_recs.sort(key=lambda x: priority_map.get(x.priority, 4))
         
-        logger.info(f"Successfully generated {len(generated_recs)} prioritized recommendations.")
-        return generated_recs
+        # Priority Deduplication Algorithm (Tie-breaker)
+        # Ensure no two recommendations share the exact same priority by shifting duplicates down.
+        # This guarantees strict uniqueness in priority levels as per requirements.
+        used_priorities = set()
+        deduped_recs = []
+        for rec in generated_recs:
+            original_priority = rec.priority
+            current_p_val = priority_map.get(original_priority, 4)
+            
+            # If the priority is already used, find the next available lower priority
+            while current_p_val in used_priorities and current_p_val <= 3:
+                current_p_val += 1
+                
+            # If current_p_val > 3, we have run out of distinct priority levels (only 4 exist).
+            # To strictly satisfy the "No duplicate priorities" requirement, we must discard it.
+            if current_p_val > 3:
+                logger.debug(f"Discarded recommendation '{rec.action}' due to priority saturation.")
+                continue
+                
+            # Map back to string
+            new_priority = {0: "Critical", 1: "High", 2: "Medium", 3: "Low"}.get(current_p_val)
+            
+            if new_priority != original_priority:
+                rec.priority = new_priority
+                logger.debug(f"Priority tie-breaker applied: shifted {rec.action} to {new_priority}")
+                
+            used_priorities.add(current_p_val)
+            deduped_recs.append(rec)
+
+        # Final sort to ensure they are strictly ordered after deduplication
+        deduped_recs.sort(key=lambda x: priority_map.get(x.priority, 4))
+
+        exec_time = (time.time() - start_time) * 1000
+        logger.info(f"Successfully generated {len(deduped_recs)} prioritized recommendations in {exec_time:.2f}ms.")
+        return deduped_recs

@@ -105,14 +105,77 @@ class ReportGenerator:
             report: The StructuredReport object.
             pretty: If True, formats the JSON with indentation for readability.
         """
+        import time
+        start_time = time.time()
         logger.info(f"Exporting report to JSON. (Pretty: {pretty})")
         
         try:
             dict_data = self.export_to_dict(report)
             if pretty:
-                return json.dumps(dict_data, indent=4, ensure_ascii=False)
+                json_str = json.dumps(dict_data, indent=4, ensure_ascii=False)
             else:
-                return json.dumps(dict_data, separators=(',', ':'), ensure_ascii=False)
+                json_str = json.dumps(dict_data, separators=(',', ':'), ensure_ascii=False)
+                
+            exec_time = (time.time() - start_time) * 1000
+            logger.info(f"Report exported to JSON successfully in {exec_time:.2f}ms.")
+            return json_str
         except TypeError as e:
             logger.error(f"JSON serialization failed: {e}")
             raise ReportError(f"Failed to serialize report to JSON: {e}")
+
+    def validate_report(self, json_str: str) -> Dict[str, Any]:
+        """
+        Validates an exported JSON report.
+        Checks for parseability, schema consistency, and completeness.
+        Returns a validation summary dict.
+        """
+        summary = {
+            "is_valid": True,
+            "errors": [],
+            "json_parsed": False,
+            "schema_verified": False
+        }
+        
+        # 1. JSON Parseability
+        try:
+            parsed_data = json.loads(json_str)
+            summary["json_parsed"] = True
+        except json.JSONDecodeError as e:
+            summary["is_valid"] = False
+            summary["errors"].append(f"Malformed JSON: {e}")
+            return summary
+            
+        # 2. Schema and Completeness Verification
+        required_fields = [
+            "incident_summary", "affected_supplier", "affected_region", 
+            "disruption_type", "impact_level", "risk_score", 
+            "mitigation_recommendations", "timestamp", "metadata"
+        ]
+        
+        for field in required_fields:
+            if field not in parsed_data:
+                summary["is_valid"] = False
+                summary["errors"].append(f"Missing required field in report: {field}")
+            elif parsed_data[field] is None:
+                summary["is_valid"] = False
+                summary["errors"].append(f"Null value for required field: {field}")
+                
+        if parsed_data.get("mitigation_recommendations"):
+            rec_fields = ["action", "priority", "estimated_time", "expected_benefit", "reason"]
+            for i, rec in enumerate(parsed_data["mitigation_recommendations"]):
+                for rf in rec_fields:
+                    if rf not in rec:
+                        summary["is_valid"] = False
+                        summary["errors"].append(f"Recommendation {i+1} missing field: {rf}")
+        else:
+            summary["is_valid"] = False
+            summary["errors"].append("Missing recommendations in report.")
+
+        summary["schema_verified"] = len(summary["errors"]) == 0
+        
+        if summary["is_valid"]:
+            logger.info("JSON Report validation completed successfully.")
+        else:
+            logger.warning(f"JSON Report validation failed: {summary['errors']}")
+            
+        return summary
