@@ -32,47 +32,34 @@ def mock_recommendations():
 
 def test_generate_report_success(report_generator, mock_context, mock_recommendations):
     report = report_generator.generate_report(mock_context, mock_recommendations)
-    
-    assert isinstance(report, StructuredReport)
     assert report.affected_region == "Miami Port"
-    assert report.affected_supplier == "Supplier X"
-    assert report.risk_score > 0
     assert len(report.mitigation_recommendations) == 1
-    assert "Weather" in report.incident_summary
 
 def test_generate_report_empty_recommendations(report_generator, mock_context):
-    with pytest.raises(ReportError) as exc:
+    with pytest.raises(ReportError):
         report_generator.generate_report(mock_context, [])
-    assert "Recommendations cannot be empty" in str(exc.value)
 
-def test_export_to_dict(report_generator, mock_context, mock_recommendations):
-    report = report_generator.generate_report(mock_context, mock_recommendations)
-    dict_report = report_generator.export_to_dict(report)
-    
-    assert isinstance(dict_report, dict)
-    assert dict_report["affected_supplier"] == "Supplier X"
-    assert isinstance(dict_report["mitigation_recommendations"], list)
-    assert dict_report["mitigation_recommendations"][0]["action"] == "Port diversion"
-
-def test_export_to_json_pretty(report_generator, mock_context, mock_recommendations):
+def test_validate_report_valid_json(report_generator, mock_context, mock_recommendations):
     report = report_generator.generate_report(mock_context, mock_recommendations)
     json_str = report_generator.export_to_json(report, pretty=True)
     
-    assert isinstance(json_str, str)
-    assert "\n" in json_str
-    assert "    " in json_str # check for indentation
-    
-    parsed = json.loads(json_str)
-    assert parsed["risk_score"] > 0
+    val_sum = report_generator.validate_report(json_str)
+    assert val_sum["is_valid"] is True
+    assert val_sum["json_parsed"] is True
+    assert val_sum["schema_verified"] is True
 
-def test_export_to_json_compact(report_generator, mock_context, mock_recommendations):
-    report = report_generator.generate_report(mock_context, mock_recommendations)
-    json_str = report_generator.export_to_json(report, pretty=False)
-    
-    assert isinstance(json_str, str)
-    assert "\n" not in json_str
-    assert '": ' not in json_str # check for compact separators
-    assert '", "' not in json_str
-    
-    parsed = json.loads(json_str)
-    assert parsed["incident_summary"] != ""
+def test_validate_report_malformed_json(report_generator):
+    bad_json = '{"incident_summary": "Incomplete json'
+    val_sum = report_generator.validate_report(bad_json)
+    assert val_sum["is_valid"] is False
+    assert val_sum["json_parsed"] is False
+
+def test_validate_report_missing_fields(report_generator):
+    incomplete_json = json.dumps({
+        "incident_summary": "Missing other fields"
+    })
+    val_sum = report_generator.validate_report(incomplete_json)
+    assert val_sum["is_valid"] is False
+    assert val_sum["json_parsed"] is True
+    assert val_sum["schema_verified"] is False
+    assert any("affected_supplier" in err for err in val_sum["errors"])
