@@ -32,9 +32,12 @@ def render_status_badge(priority: str):
         unsafe_allow_html=True
     )
 
-@st.cache_resource
-def get_recommendation_engine():
-    return RecommendationEngine()
+@st.cache_data(show_spinner=False)
+def generate_recommendations_cached(context_dict: dict):
+    engine = RecommendationEngine()
+    recs = engine.generate_recommendations(context_dict)
+    val_summary = engine.validate_recommendations(recs)
+    return recs, val_summary
 
 # ==========================================
 # Session State Management
@@ -52,7 +55,7 @@ with st.sidebar:
     st.markdown("Simulate an incoming disruption event to generate recommendations.")
     
     with st.form("simulation_form"):
-        disruption_type = st.selectbox("Disruption Type", ["Strike", "Weather", "Geopolitical", "Equipment Failure", "Cyberattack"])
+        disruption_type = st.selectbox("Disruption Type", ["Strike", "Weather", "Geopolitical", "Cyberattack", "Equipment failure", "Transportation delay", "Supplier shutdown", "Port congestion", "Inventory shortage"])
         impact_level = st.selectbox("Impact Severity", ["Low", "Medium", "High", "Severe"], index=3) # Default to Severe
         affected_supplier = st.text_input("Affected Supplier", value="Oceanic Logistics Corp")
         affected_location = st.text_input("Affected Region", value="Port of Hamburg")
@@ -82,13 +85,13 @@ if generate_btn:
         "industry": industry
     }
     
-    engine = get_recommendation_engine()
     try:
         with st.spinner("Analyzing disruption and matching mitigation strategies..."):
-            recs = engine.generate_recommendations(context)
+            recs, val_summary = generate_recommendations_cached(context)
             
             st.session_state.recommendations = recs
             st.session_state.current_context = context
+            st.session_state.validation_summary = val_summary
             logger.info(f"Generated {len(recs)} recommendations and saved to session state.")
     except RecommendationError as e:
         logger.error(f"Failed to generate recommendations: {e}")
@@ -101,6 +104,21 @@ if generate_btn:
 # Main UI Layout
 # ==========================================
 st.title("🛡️ Mitigation Recommendations Dashboard")
+
+# Demo Readiness Panel
+if st.session_state.get("validation_summary"):
+    with st.expander("✅ System Validation & Diagnostics (Demo Ready)", expanded=False):
+        v_sum = st.session_state.validation_summary
+        if v_sum["is_valid"]:
+            st.success("System Ready: All validation checks passed.")
+            st.markdown("- ✅ Priorities Verified (No duplicates, proper ordering)")
+            st.markdown("- ✅ Completeness Verified (All required fields present)")
+            st.markdown("- ✅ Performance Optimized (Cached)")
+        else:
+            st.error("System Ready Check Failed: Validation Errors Detected")
+            for err in v_sum["errors"]:
+                st.error(err)
+
 st.markdown("Review and prioritize AI-generated mitigation strategies based on real-time disruption data.")
 
 if not st.session_state.recommendations:

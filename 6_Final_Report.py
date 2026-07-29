@@ -9,9 +9,18 @@ logger = get_logger("streamlit_ui_report")
 
 st.set_page_config(page_title="Final Mitigation Report", page_icon="📄", layout="wide")
 
-@st.cache_resource
-def get_report_generator():
-    return ReportGenerator()
+@st.cache_data(show_spinner=False)
+def generate_report_cached(context_dict: dict, recs: list) -> tuple:
+    report_gen = ReportGenerator()
+    context_obj = DisruptionContext(**context_dict)
+    report = report_gen.generate_report(context=context_obj, recommendations=recs)
+    
+    pretty_json = report_gen.export_to_json(report, pretty=True)
+    compact_json = report_gen.export_to_json(report, pretty=False)
+    
+    val_summary = report_gen.validate_report(pretty_json)
+    
+    return report, pretty_json, compact_json, val_summary
 
 def render_report_ui(report: StructuredReport):
     """Helper function to render the report visually before download."""
@@ -57,19 +66,27 @@ if not raw_context or "affected_supplier" not in raw_context or "affected_locati
 
 st.markdown("Review the structured mitigation report below and export it for downstream AI agent ingestion or distribution.")
 
-report_gen = get_report_generator()
-
 try:
-    # 1. Build the Pydantic Context object required by the backend
-    context_obj = DisruptionContext(**raw_context)
-    
-    # 2. Generate Report (This is fast, but in a heavy system we'd use @st.cache_data)
+    # Generate Report using Caching
     with st.spinner("Compiling structured report..."):
-        report = report_gen.generate_report(context=context_obj, recommendations=recs)
+        report, pretty_json, compact_json, val_summary = generate_report_cached(raw_context, recs)
     
     logger.info("Successfully generated structured report for UI display.")
     
     # 3. Render Visual UI
+    
+    # Demo Readiness Panel
+    with st.expander("✅ JSON Validation & Schema Diagnostics", expanded=False):
+        if val_summary["is_valid"]:
+            st.success("JSON Report Validated Successfully.")
+            st.markdown("- ✅ Parseable format confirmed")
+            st.markdown("- ✅ Schema consistency guaranteed")
+            st.markdown("- ✅ Zero missing required fields")
+        else:
+            st.error("JSON Report Validation Failed.")
+            for err in val_summary["errors"]:
+                st.error(err)
+                
     render_report_ui(report)
     
     # 4. Export Options
@@ -77,28 +94,27 @@ try:
     st.subheader("💾 Export Report")
     st.markdown("Download the standard JSON payload. This payload is strictly formatted for consumption by LLMs and LangGraph endpoints.")
     
-    # Generate JSON strings
-    pretty_json = report_gen.export_to_json(report, pretty=True)
-    compact_json = report_gen.export_to_json(report, pretty=False)
-    
-    dl_col1, dl_col2 = st.columns(2)
-    with dl_col1:
-        st.download_button(
-            label="⬇️ Download Pretty JSON",
-            data=pretty_json,
-            file_name=f"mitigation_report_{report.affected_supplier.replace(' ', '_')}.json",
-            mime="application/json",
-            type="primary",
-            use_container_width=True
-        )
-    with dl_col2:
-        st.download_button(
-            label="⬇️ Download Compact JSON",
-            data=compact_json,
-            file_name=f"mitigation_report_{report.affected_supplier.replace(' ', '_')}_compact.json",
-            mime="application/json",
-            use_container_width=True
-        )
+    if val_summary["is_valid"]:
+        dl_col1, dl_col2 = st.columns(2)
+        with dl_col1:
+            st.download_button(
+                label="⬇️ Download Pretty JSON",
+                data=pretty_json,
+                file_name=f"mitigation_report_{report.affected_supplier.replace(' ', '_')}.json",
+                mime="application/json",
+                type="primary",
+                use_container_width=True
+            )
+        with dl_col2:
+            st.download_button(
+                label="⬇️ Download Compact JSON",
+                data=compact_json,
+                file_name=f"mitigation_report_{report.affected_supplier.replace(' ', '_')}_compact.json",
+                mime="application/json",
+                use_container_width=True
+            )
+    else:
+        st.error("❌ Downloads disabled due to JSON validation failures. Please review the diagnostics panel.")
 
 except ReportError as e:
     st.error(f"❌ Failed to generate report: {e}")
